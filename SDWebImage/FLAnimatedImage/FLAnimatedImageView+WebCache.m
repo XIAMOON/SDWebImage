@@ -48,6 +48,8 @@
                   progress:(nullable SDWebImageDownloaderProgressBlock)progressBlock
                  completed:(nullable SDExternalCompletionBlock)completedBlock {
     __weak typeof(self)weakSelf = self;
+    // 一个类A的Category可以调用A的父类的Category的方法。就像子类调用父类方法一样。
+    //FIXME: 可以巩固一下，类和分类的区别和联系
     [self sd_internalSetImageWithURL:url
                     placeholderImage:placeholder
                              options:options

@@ -30,6 +30,9 @@ typedef NSMutableDictionary<NSString *, id> SDOperationsDictionary;
 
 - (void)sd_setImageLoadOperation:(nullable id)operation forKey:(nullable NSString *)key {
     if (key) {
+        // 1、通过key在字典里找到对应的operation，然后调用其cancel方法。其实operation并没有cancel方法，只是它实现了SDWebImageOperation而已。这里的operation还有可能是一个数组。
+        // 2、把operation从字典里移除。
+        // 3、把新的operation用key存在字典里。
         [self sd_cancelImageLoadOperationWithKey:key];
         if (operation) {
             SDOperationsDictionary *operationDictionary = [self operationDictionary];
