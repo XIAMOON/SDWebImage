@@ -370,13 +370,15 @@ FOUNDATION_STATIC_INLINE NSUInteger SDCacheCostForImage(UIImage *image) {
     }
 
     // First check the in-memory cache...
+    // 最先从内存中寻找缓存图片
     UIImage *image = [self imageFromMemoryCacheForKey:key];
     if (image) {
         NSData *diskData = nil;
-        if ([image isGIF]) {
+        if ([image isGIF]) { // 如果image.images存在的话，就有多张图片，以此判断为GIF图片。
             diskData = [self diskImageDataBySearchingAllPathsForKey:key];
         }
         if (doneBlock) {
+            // 在内存中找到图片后直接回调block
             doneBlock(image, diskData, SDImageCacheTypeMemory);
         }
         return nil;

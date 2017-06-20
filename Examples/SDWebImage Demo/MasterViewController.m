@@ -130,7 +130,7 @@
     cell.customTextLabel.text = [NSString stringWithFormat:@"Image #%ld", (long)indexPath.row];
     [cell.customImageView sd_setImageWithURL:[NSURL URLWithString:_objects[indexPath.row]]
                             placeholderImage:placeholderImage
-                                     options:indexPath.row == 0 ? SDWebImageRefreshCached : 0];
+                                     options:indexPath.row == 0 ? SDWebImageRefreshCached : 0];    
     return cell;
 }
 

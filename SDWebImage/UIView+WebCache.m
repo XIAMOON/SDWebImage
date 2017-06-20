@@ -138,7 +138,7 @@ static char TAG_ACTIVITY_SHOW;
 - (void)sd_setImage:(UIImage *)image imageData:(NSData *)imageData basedOnClassOrViaCustomSetImageBlock:(SDSetImageBlock)setImageBlock {
     if (setImageBlock) {
         // block1(setImageBlock)在这里得到了想要的数据，所以将会主动触发回调。
-        // 立马回调到setImageBlock内部，其内部是给imageView设置这里的image，而这里的image正好是placeholder，所以是把placeholder设置给imageView。
+        // 立马回调到setImageBlock内部并return。其内部是给imageView设置这里的image。
         setImageBlock(image, imageData);
         return;
     }

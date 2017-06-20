@@ -102,6 +102,10 @@
     }];
 }
 
+
+// 这个函数主要是：
+// 1、从内存在找图片
+// 2、下载图片
 - (id <SDWebImageOperation>)loadImageWithURL:(nullable NSURL *)url
                                      options:(SDWebImageOptions)options
                                     progress:(nullable SDWebImageDownloaderProgressBlock)progressBlock
@@ -135,24 +139,40 @@
         return operation;
     }
 
+    // 把请求出错的URL缓存起来，避免...
     @synchronized (self.runningOperations) {
         [self.runningOperations addObject:operation];
     }
     NSString *key = [self cacheKeyForURL:url];
 
+    // 从内存或者磁盘中寻找缓存图片
     operation.cacheOperation = [self.imageCache queryCacheOperationForKey:key done:^(UIImage *cachedImage, NSData *cachedData, SDImageCacheType cacheType) {
+        //TODO: 弄清楚isCancelled的用法
         if (operation.isCancelled) {
             [self safelyRemoveOperationFromRunning:operation];
             return;
         }
 
+        // 当内存缓存、磁盘缓存中都没有缓存图像，或者option是刷新缓存选项；且代理人没有实现imageManager:shouldDownloadImageForURL:方法 或者代理人实现了方法并返回YES(即应该download)时
+        
+        // 需要下载图片
         if ((!cachedImage || options & SDWebImageRefreshCached) && (![self.delegate respondsToSelector:@selector(imageManager:shouldDownloadImageForURL:)] || [self.delegate imageManager:self shouldDownloadImageForURL:url])) {
+            
+            
+            /************/
+            // 当缓存中有图片，但是option却是刷新缓存选项时。先internalBlock回调把缓存图片设置给控件显示。注意，之前已经把placeholder设置给控件显示过了。这里如果options是其他选项，就不会走这里的一步(即把缓存图片先设置给控件显示)。
             if (cachedImage && options & SDWebImageRefreshCached) {
+                // 通知缓存的图片
                 // If image was found in the cache but SDWebImageRefreshCached is provided, notify about the cached image
+                // 并且试着重新下载它，以便让NSURLCache有机会从服务器刷新它
                 // AND try to re-download it in order to let a chance to NSURLCache to refresh it from server.
+                
+                // block回调到internalBlock，给控件设置图片
                 [self callCompletionBlockForOperation:weakOperation completion:completedBlock image:cachedImage data:cachedData error:nil cacheType:cacheType finished:YES url:url];
             }
-
+            /************/
+            
+            
             // download if no image or requested to refresh anyway, and download allowed by delegate
             SDWebImageDownloaderOptions downloaderOptions = 0;
             if (options & SDWebImageLowPriority) downloaderOptions |= SDWebImageDownloaderLowPriority;
@@ -171,13 +191,18 @@
                 downloaderOptions |= SDWebImageDownloaderIgnoreCachedResponse;
             }
             
+            // 下载图片并返回一个Token
+            // TODO: 这里难道不用判断url是否在黑名单里吗？
+            
             SDWebImageDownloadToken *subOperationToken = [self.imageDownloader downloadImageWithURL:url options:downloaderOptions progress:progressBlock completed:^(UIImage *downloadedImage, NSData *downloadedData, NSError *error, BOOL finished) {
                 __strong __typeof(weakOperation) strongOperation = weakOperation;
+                
                 if (!strongOperation || strongOperation.isCancelled) {
                     // Do nothing if the operation was cancelled
                     // See #699 for more details
                     // if we would call the completedBlock, there could be a race condition between this block and another completedBlock for the same object, so if this one is called second, we will overwrite the new data
-                } else if (error) {
+                }
+                else if (error) {
                     [self callCompletionBlockForOperation:strongOperation completion:completedBlock error:error url:url];
 
                     if (   error.code != NSURLErrorNotConnectedToInternet
@@ -188,11 +213,14 @@
                         && error.code != NSURLErrorCannotFindHost
                         && error.code != NSURLErrorCannotConnectToHost
                         && error.code != NSURLErrorNetworkConnectionLost) {
+                        // 因为self.failedURLs是不可变的，所以这里加了同步锁。
                         @synchronized (self.failedURLs) {
+                            // 当图片下载失败时，把URL加入黑名单。
                             [self.failedURLs addObject:url];
                         }
                     }
                 }
+                // 有可能在第一次就下载成功了，也有可能之前下载失败了，被加入了黑名单
                 else {
                     if ((options & SDWebImageRetryFailed)) {
                         @synchronized (self.failedURLs) {
@@ -228,16 +256,24 @@
                     [self safelyRemoveOperationFromRunning:strongOperation];
                 }
             }];
+            
+            
             operation.cancelBlock = ^{
                 [self.imageDownloader cancel:subOperationToken];
                 __strong __typeof(weakOperation) strongOperation = weakOperation;
                 [self safelyRemoveOperationFromRunning:strongOperation];
             };
-        } else if (cachedImage) {
+        }
+        
+        // 除开上面的一些情况，如果缓存图片存在的话，直接用internalBlock回调回去，给控件显示图片
+        else if (cachedImage) {
             __strong __typeof(weakOperation) strongOperation = weakOperation;
             [self callCompletionBlockForOperation:strongOperation completion:completedBlock image:cachedImage data:cachedData error:nil cacheType:cacheType finished:YES url:url];
             [self safelyRemoveOperationFromRunning:operation];
-        } else {
+        }
+        
+        // 没有缓存图片，并且代理人不允许下载图片。这种情况很少出现。
+        else {
             // Image not in cache and download disallowed by delegate
             __strong __typeof(weakOperation) strongOperation = weakOperation;
             [self callCompletionBlockForOperation:strongOperation completion:completedBlock image:nil data:nil error:nil cacheType:SDImageCacheTypeNone finished:YES url:url];

@@ -16,6 +16,9 @@ typedef NS_OPTIONS(NSUInteger, SDWebImageOptions) {
     /**
      * By default, when a URL fail to be downloaded, the URL is blacklisted so the library won't keep trying.
      * This flag disable this blacklisting.
+     * 默认情况下，当一个URL在下载的时候失败了，那么这个URL就会被列入黑名单，那么这个库将不会再去尝试下载。
+     * 这个标志会禁止这个黑名单的做法。
+     * 即：当设置这个标志时，哪怕URL请求失败了，也会再不断地尝试继续下载。
      */
     // 0001 << 0 = 0001 = 1;
     SDWebImageRetryFailed = 1 << 0,
@@ -43,6 +46,7 @@ typedef NS_OPTIONS(NSUInteger, SDWebImageOptions) {
     /**
      * Even if the image is cached, respect the HTTP response cache control, and refresh the image from remote location if needed.
      * The disk caching will be handled by NSURLCache instead of SDWebImage leading to slight performance degradation.
+     * 这个选项一般用于在相同请求URL之后更改的图像。
      * This option helps deal with images changing behind the same request URL, e.g. Facebook graph api profile pics.
      * If a cached image is refreshed, the completion block is called once with the cached image and again with the final image.
      *
@@ -82,6 +86,7 @@ typedef NS_OPTIONS(NSUInteger, SDWebImageOptions) {
     /**
      * By default, placeholder images are loaded while the image is loading. This flag will delay the loading
      * of the placeholder image until after the image has finished loading.
+     * 只有当图片通过URL下载成功之后，才会加载placehoder。
      */
     // 512
     SDWebImageDelayPlaceholder = 1 << 9,
