@@ -310,14 +310,26 @@ FOUNDATION_STATIC_INLINE NSUInteger SDCacheCostForImage(UIImage *image) {
 }
 
 - (nullable NSData *)diskImageDataBySearchingAllPathsForKey:(nullable NSString *)key {
+    // key ---> diskImagePath
+    // 1、key就是url。比如：http://assets.sbnation.com/assets/2512203/dogflops.gif
+    // 2、然后把这个url按照MD5加密，抽出固定16位字母数字的形式，最后拼上url的后缀，整体拼成fileName。如：4ad9ae8eabfec60b40bf48f0bfc2d120.gif
+    // 3、用磁盘缓存路径：self.diskCachePath和fileName整体拼接成一个defaultPath作为图片的本地缓存路径。
+    
     NSString *defaultPath = [self defaultCachePathForKey:key];
     NSData *data = [NSData dataWithContentsOfFile:defaultPath];
     if (data) {
         return data;
     }
 
+    
+    // 下面的整个这一部分代码是不是为了解决历史遗留问题。
+    
     // fallback because of https://github.com/rs/SDWebImage/pull/976 that added the extension to the disk file name
     // checking the key with and without the extension
+    
+    // stringByDeletingPathExtension。删除 ".xxx"
+    // 这个path是去掉了后缀名的defaultPath。
+    NSString *path2 = [defaultPath stringByDeletingPathExtension];
     data = [NSData dataWithContentsOfFile:defaultPath.stringByDeletingPathExtension];
     if (data) {
         return data;
@@ -370,7 +382,7 @@ FOUNDATION_STATIC_INLINE NSUInteger SDCacheCostForImage(UIImage *image) {
     }
 
     // First check the in-memory cache...
-    // 最先从内存中寻找缓存图片
+    // 最先从内存中寻找缓存图片，从缓存中加载的图片不需要解码，也就是说几乎没有耗时操作，所以并没有创建NSOperation对象。内存是存在于软件运行的环境中的，代码可以直接访问内存，但是不能直接访问磁盘，这里需要一个环境转换，所以从磁盘中加载图片是需要耗时的。
     UIImage *image = [self imageFromMemoryCacheForKey:key];
     if (image) {
         NSData *diskData = nil;
@@ -379,20 +391,26 @@ FOUNDATION_STATIC_INLINE NSUInteger SDCacheCostForImage(UIImage *image) {
         }
         if (doneBlock) {
             // 在内存中找到图片后直接回调block
+            // 注：这里只有GIF图片才有diskData
             doneBlock(image, diskData, SDImageCacheTypeMemory);
         }
         return nil;
     }
 
+    // 从磁盘中取。这里用了GCD，把一个异步任务放进了一个串行队列中。
+    // 串行队列异步执行，特点是系统会另开一个线程，并按添加顺序串行执行任务。即不会阻塞主线程，且只有上一个任务执行完之后才会执行下一个任务。
     NSOperation *operation = [NSOperation new];
     dispatch_async(self.ioQueue, ^{
         if (operation.isCancelled) {
             // do not call the completion if cancelled
+            // 如果已经取消了的话，这里将不会回调block，所以最开始我们自己的代码中的那个block就不会执行。
             return;
         }
 
         @autoreleasepool {
+            
             NSData *diskData = [self diskImageDataBySearchingAllPathsForKey:key];
+            
             UIImage *diskImage = [self diskImageForKey:key];
             if (diskImage && self.config.shouldCacheImagesInMemory) {
                 NSUInteger cost = SDCacheCostForImage(diskImage);

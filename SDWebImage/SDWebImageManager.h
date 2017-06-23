@@ -198,6 +198,9 @@ SDWebImageManager *manager = [SDWebImageManager sharedManager];
 
  * @endcode
  */
+
+// 这里的cacheKeyFilter可以看做是一个协议protocol，如果外部实现了这个block的话，事情就可以由外部来决定了。
+// 以后可以用block来代替protocol了。
 @property (nonatomic, copy, nullable) SDWebImageCacheKeyFilterBlock cacheKeyFilter;
 
 /**

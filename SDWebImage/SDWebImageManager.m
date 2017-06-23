@@ -59,6 +59,7 @@
         return @"";
     }
 
+    // 这里的这个cacheKeyFilter，这是个block。这里的作用可以看做是一个protocol。
     if (self.cacheKeyFilter) {
         return self.cacheKeyFilter(url);
     } else {
@@ -127,6 +128,7 @@
     __block SDWebImageCombinedOperation *operation = [SDWebImageCombinedOperation new];
     __weak SDWebImageCombinedOperation *weakOperation = operation;
 
+    // 用来标记是不是一个请求失败的url
     BOOL isFailedUrl = NO;
     if (url) {
         @synchronized (self.failedURLs) {
@@ -134,18 +136,22 @@
         }
     }
 
+    // 如果options除了是"失败后重试"这个选项以外，且这个url已经是一个请求失败的url，那么这里用block直接返回，不再进行后续步骤，对应返回的image及imageData都为nil。  而且，默认情况下，options本来就是失败后不允许重试的，所以，一般只要一个url请求失败的话，是不会进行后续步骤的，除非你指定了失败后允许重试:SDWebImageRetryFailed。
     if (url.absoluteString.length == 0 || (!(options & SDWebImageRetryFailed) && isFailedUrl)) {
         [self callCompletionBlockForOperation:operation completion:completedBlock error:[NSError errorWithDomain:NSURLErrorDomain code:NSURLErrorFileDoesNotExist userInfo:nil] url:url];
         return operation;
     }
+    
 
-    // 把请求出错的URL缓存起来，避免...
+    // 绝大部分情况下，能走到这一步的都是第一次来请求的url，除非指定了options为SDWebImageRetryFailed。
     @synchronized (self.runningOperations) {
         [self.runningOperations addObject:operation];
     }
+    
+    // 这里的key是直接用的url，如果你没有实现self.cacheKeyFilter这个block的话。
     NSString *key = [self cacheKeyForURL:url];
 
-    // 从内存或者磁盘中寻找缓存图片
+    // 从内存或者磁盘中寻找缓存图片，找到之后会用block回调回来。注意：这里之所以用block肯定是因为寻找缓存图片是一个耗时操作，会涉及到多线程。想想多个图片正在请求时会发生什么...
     operation.cacheOperation = [self.imageCache queryCacheOperationForKey:key done:^(UIImage *cachedImage, NSData *cachedData, SDImageCacheType cacheType) {
         //TODO: 弄清楚isCancelled的用法
         if (operation.isCancelled) {
