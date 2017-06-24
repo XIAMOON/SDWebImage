@@ -43,6 +43,7 @@ FOUNDATION_STATIC_INLINE NSUInteger SDCacheCostForImage(UIImage *image) {
 #if SD_MAC
     return image.size.height * image.size.width;
 #elif SD_UIKIT || SD_WATCH
+    // 图片的宽*图片的缩放指数，也就是说这个宽不是像素宽，而是point点数宽。retina屏：1 point = 2 * pixels。
     return image.size.height * image.size.width * image.scale * image.scale;
 #endif
 }
@@ -322,13 +323,13 @@ FOUNDATION_STATIC_INLINE NSUInteger SDCacheCostForImage(UIImage *image) {
     }
 
     
-    // 下面的整个这一部分代码是不是为了解决历史遗留问题。
+    // 下面的整个这一部分代码是不是为了解决历史遗留问题？
     
     // fallback because of https://github.com/rs/SDWebImage/pull/976 that added the extension to the disk file name
     // checking the key with and without the extension
     
     // stringByDeletingPathExtension。删除 ".xxx"
-    // 这个path是去掉了后缀名的defaultPath。
+    // 这个path2是去掉了后缀名的defaultPath。
     NSString *path2 = [defaultPath stringByDeletingPathExtension];
     data = [NSData dataWithContentsOfFile:defaultPath.stringByDeletingPathExtension];
     if (data) {
@@ -354,12 +355,25 @@ FOUNDATION_STATIC_INLINE NSUInteger SDCacheCostForImage(UIImage *image) {
     return nil;
 }
 
+/* 获取磁盘中的图片，并且解压缩 */
 - (nullable UIImage *)diskImageForKey:(nullable NSString *)key {
     NSData *data = [self diskImageDataBySearchingAllPathsForKey:key];
     if (data) {
+        
+        /* 通过data数据生成UIImage对象 */
+        // 1、先是判断了图片的类型
+        // 2、通过底层的C函数，把NSData转换成UIIimage
         UIImage *image = [UIImage sd_imageWithData:data];
+        
+        /* 获取缩放后的图片 */
+        // 1、key就是url，image是上面通过data转换后的Image
+        // 2、通过判断key中是否包含@2x、@3x来确定图片的scale缩放属性，得出scale值
+        // 3、对于image.images存在且个数大于0的图片来说，通过遍历image.images数组里的每一帧图片，把每一帧图片调用：initWithCGImage: scale: orientation:来生成缩放后的每一帧图片。最后再调用：animatedImageWithImages: duration:来返回最终的图片。这里的duration代表每一帧图片播放的时长。
+        // 4、对于image.images不存在的图片，直接调用：initWithCGImage: scale: orientation:来生成缩放后的图片并返回。
         image = [self scaledImageForKey:key image:image];
+        
         if (self.config.shouldDecompressImages) {
+            /* 解压缩图片 */
             image = [UIImage decodedImageWithImage:image];
         }
         return image;
@@ -408,16 +422,20 @@ FOUNDATION_STATIC_INLINE NSUInteger SDCacheCostForImage(UIImage *image) {
         }
 
         @autoreleasepool {
-            
+            // 搜索磁盘所有文件夹里的本地图片的data数据
             NSData *diskData = [self diskImageDataBySearchingAllPathsForKey:key];
             
+            // 获取磁盘中的图片，并且解压缩
             UIImage *diskImage = [self diskImageForKey:key];
+            
             if (diskImage && self.config.shouldCacheImagesInMemory) {
-                NSUInteger cost = SDCacheCostForImage(diskImage);
+                // 把图片缓存到内存缓存
+                NSUInteger cost = SDCacheCostForImage(diskImage); // 计算图片所占的内存
                 [self.memCache setObject:diskImage forKey:key cost:cost];
             }
 
             if (doneBlock) {
+                // 到主线程用doneBlock回调回去。
                 dispatch_async(dispatch_get_main_queue(), ^{
                     doneBlock(diskImage, diskData, SDImageCacheTypeDisk);
                 });

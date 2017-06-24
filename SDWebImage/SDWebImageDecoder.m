@@ -12,8 +12,8 @@
 @implementation UIImage (ForceDecode)
 
 #if SD_UIKIT || SD_WATCH
-static const size_t kBytesPerPixel = 4;
-static const size_t kBitsPerComponent = 8;
+static const size_t kBytesPerPixel = 4; //每个像素点占4个字节
+static const size_t kBitsPerComponent = 8; // 一个像素点包含4个部分：R G B A。每个部分占1个字节，也就是8位。
 
 + (nullable UIImage *)decodedImageWithImage:(nullable UIImage *)image {
     if (![UIImage shouldDecodeImage:image]) {
@@ -266,6 +266,8 @@ static const CGFloat kDestSeemOverlap = 2.0f;   // the numbers of pixels to over
     }
     return colorspaceRef;
 }
+
+// MAC下并没有编码和解码
 #elif SD_MAC
 + (nullable UIImage *)decodedImageWithImage:(nullable UIImage *)image {
     return image;

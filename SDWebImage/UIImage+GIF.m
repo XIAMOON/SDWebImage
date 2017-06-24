@@ -25,7 +25,7 @@
 
     UIImage *staticImage;
 
-    if (count <= 1) {
+    if (count <= 1) { // 图片源里只有一张图片的话，就代表是一个普通图片，而非GIF图片
         staticImage = [[UIImage alloc] initWithData:data];
     } else {
         // we will only retrieve the 1st frame. the full GIF support is available via the FLAnimatedImageView category.

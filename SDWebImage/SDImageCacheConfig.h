@@ -15,6 +15,8 @@
  * Decompressing images that are downloaded and cached can improve performance but can consume lot of memory.
  * Defaults to YES. Set this to NO if you are experiencing a crash due to excessive memory consumption.
  */
+//compress：压缩。decompress：解压缩。
+
 @property (assign, nonatomic) BOOL shouldDecompressImages;
 
 /**

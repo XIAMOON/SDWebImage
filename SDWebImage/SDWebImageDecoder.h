@@ -10,6 +10,8 @@
 #import <Foundation/Foundation.h>
 #import "SDWebImageCompat.h"
 
+// 这个类好奇怪啊，它并没有实现以文件名来命名的那个类。而是实现了一个UIImage的分类。
+
 @interface UIImage (ForceDecode)
 
 + (nullable UIImage *)decodedImageWithImage:(nullable UIImage *)image;

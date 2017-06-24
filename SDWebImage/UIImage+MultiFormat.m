@@ -23,21 +23,38 @@
     }
     
     UIImage *image;
+    // 获取图片类型
     SDImageFormat imageFormat = [NSData sd_imageFormatForImageData:data];
+    
+    /* GIF图片 */
     if (imageFormat == SDImageFormatGIF) {
+        // 1、通过C函数：CGImageSourceRef、CGImageRef，来把NSData转换为UIImage对象。其中GIF图只取了第一帧。
         image = [UIImage sd_animatedGIFWithData:data];
     }
+    
 #ifdef SD_WEBP
-    else if (imageFormat == SDImageFormatWebP)
-    {
+    /* WEBP图片 */
+    else if (imageFormat == SDImageFormatWebP) {
         image = [UIImage sd_imageWithWebPData:data];
     }
 #endif
+    
     else {
         image = [[UIImage alloc] initWithData:data];
+        
 #if SD_UIKIT || SD_WATCH
+        // 通过NSData来获取图片的方向
+        // 主要是通过C函数：
+        // 1、通过CGImageSourceCreateWithData()把NSData转为CGImageSourceRef。CGImageSourceRef是一个结构体。
+        // 2、通过CGImageSourceCopyPropertiesAtIndex()在CGImageSourceRef中抽取到一个包含图片信息的"C字典"CGImageSourceRef。CGImageSourceRef也是一个结构体。
+        // 3、通过CFDictionaryGetValue()方法在"C字典"CGImageSourceRef中获取key为kCGImagePropertyOrientation对应的值。
+        // 4、通过CFNumberGetValue()方法吧3中的值转换为CFNumber。其对应的是int值。
+        // 5、任何图片的二进制数据NSData中都有包含图片的方向等等信息的数据。而且业界都有统一的规范。我们可以通过4中拿到的int数据，然后对应那个规范就能准确获取图片的方向。
         UIImageOrientation orientation = [self sd_imageOrientationFromImageData:data];
         if (orientation != UIImageOrientationUp) {
+            
+            // 如果获取到的不是方向朝上的图片的话
+            // TODO: 这里这样通过一个UIImage对象再次生成一个UIImage对象，这样做是为了什么？
             image = [UIImage imageWithCGImage:image.CGImage
                                         scale:image.scale
                                   orientation:orientation];
@@ -50,6 +67,7 @@
 }
 
 #if SD_UIKIT || SD_WATCH
+// 通过NSData来获取图片的方向
 +(UIImageOrientation)sd_imageOrientationFromImageData:(nonnull NSData *)imageData {
     UIImageOrientation result = UIImageOrientationUp;
     CGImageSourceRef imageSource = CGImageSourceCreateWithData((__bridge CFDataRef)imageData, NULL);

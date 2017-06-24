@@ -136,13 +136,13 @@
         }
     }
 
-    // 如果options除了是"失败后重试"这个选项以外，且这个url已经是一个请求失败的url，那么这里用block直接返回，不再进行后续步骤，对应返回的image及imageData都为nil。  而且，默认情况下，options本来就是失败后不允许重试的，所以，一般只要一个url请求失败的话，是不会进行后续步骤的，除非你指定了失败后允许重试:SDWebImageRetryFailed。
+    // 如果options除了是"失败后重试"这个选项以外并且这个url已经是一个请求失败的url，那么这里用block直接返回，不再进行后续步骤，对应返回的image及imageData都为nil。
+    // 而且，默认情况下，options本来就是失败后不允许重试的，所以，一般只要一个url请求失败的话，是不会进行后续步骤的，除非你指定了失败后允许重试:SDWebImageRetryFailed。
     if (url.absoluteString.length == 0 || (!(options & SDWebImageRetryFailed) && isFailedUrl)) {
         [self callCompletionBlockForOperation:operation completion:completedBlock error:[NSError errorWithDomain:NSURLErrorDomain code:NSURLErrorFileDoesNotExist userInfo:nil] url:url];
         return operation;
     }
     
-
     // 绝大部分情况下，能走到这一步的都是第一次来请求的url，除非指定了options为SDWebImageRetryFailed。
     @synchronized (self.runningOperations) {
         [self.runningOperations addObject:operation];
@@ -151,10 +151,17 @@
     // 这里的key是直接用的url，如果你没有实现self.cacheKeyFilter这个block的话。
     NSString *key = [self cacheKeyForURL:url];
 
+    
     // 从内存或者磁盘中寻找缓存图片，找到之后会用block回调回来。注意：这里之所以用block肯定是因为寻找缓存图片是一个耗时操作，会涉及到多线程。想想多个图片正在请求时会发生什么...
+    
+    // 1、先在内存中查找图片，找到之后用doneBlock回调回来。
+    // 2、内存中没有，则到磁盘中查找，找到data二进制数据，然后通过C函数把NSData数据转换成UIImage对象，然后把图片进行正常缩放，最后把图片解压缩。
+    // 3、把解压缩后的图片缓存到内存中，然后用doneBlock回调回来。
     operation.cacheOperation = [self.imageCache queryCacheOperationForKey:key done:^(UIImage *cachedImage, NSData *cachedData, SDImageCacheType cacheType) {
+        
         //TODO: 弄清楚isCancelled的用法
         if (operation.isCancelled) {
+            // 加锁从self.runningOperations中移除这个operation
             [self safelyRemoveOperationFromRunning:operation];
             return;
         }
@@ -163,7 +170,6 @@
         
         // 需要下载图片
         if ((!cachedImage || options & SDWebImageRefreshCached) && (![self.delegate respondsToSelector:@selector(imageManager:shouldDownloadImageForURL:)] || [self.delegate imageManager:self shouldDownloadImageForURL:url])) {
-            
             
             /************/
             // 当缓存中有图片，但是option却是刷新缓存选项时。先internalBlock回调把缓存图片设置给控件显示。注意，之前已经把placeholder设置给控件显示过了。这里如果options是其他选项，就不会走这里的一步(即把缓存图片先设置给控件显示)。
@@ -198,8 +204,7 @@
             }
             
             // 下载图片并返回一个Token
-            // TODO: 这里难道不用判断url是否在黑名单里吗？
-            
+#warning - 下次从这里开始看
             SDWebImageDownloadToken *subOperationToken = [self.imageDownloader downloadImageWithURL:url options:downloaderOptions progress:progressBlock completed:^(UIImage *downloadedImage, NSData *downloadedData, NSError *error, BOOL finished) {
                 __strong __typeof(weakOperation) strongOperation = weakOperation;
                 
