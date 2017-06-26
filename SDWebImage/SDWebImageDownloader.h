@@ -11,12 +11,17 @@
 #import "SDWebImageOperation.h"
 
 typedef NS_OPTIONS(NSUInteger, SDWebImageDownloaderOptions) {
+    // 低优先级下载
     SDWebImageDownloaderLowPriority = 1 << 0,
+    
+    // 渐进式下载
     SDWebImageDownloaderProgressiveDownload = 1 << 1,
 
     /**
      * By default, request prevent the use of NSURLCache. With this flag, NSURLCache
      * is used with default policies.
+     
+     * 默认情况下，请求阻止使用NSURLCache。 当使用此标志时，NSURLCache会与默认策略一起使用。
      */
     SDWebImageDownloaderUseNSURLCache = 1 << 2,
 
@@ -24,46 +29,59 @@ typedef NS_OPTIONS(NSUInteger, SDWebImageDownloaderOptions) {
      * Call completion block with nil image/imageData if the image was read from NSURLCache
      * (to be combined with `SDWebImageDownloaderUseNSURLCache`).
      * I think this option should be renamed to 'SDWebImageDownloaderUsingCachedResponseDontLoad'
+     
+     * 如果从NSURLCache读取图像（与“SDWebImageDownloaderUseNSURLCache”组合），则使用空的 image / imageData来回调completion block。 我认为这个选项应该重命名为'SDWebImageDownloaderUsingCachedResponseDontLoad'
      */
     SDWebImageDownloaderIgnoreCachedResponse = 1 << 3,
     
     /**
      * In iOS 4+, continue the download of the image if the app goes to background. This is achieved by asking the system for
      * extra time in background to let the request finish. If the background task expires the operation will be cancelled.
+     
+     * 在iOS 4以后，如果应用程序进入后台，会继续下载图像。 这是通过在后台询问系统额外的时间来完成的。 如果后台任务到期，操作将被取消。
      */
     SDWebImageDownloaderContinueInBackground = 1 << 4,
 
     /**
      * Handles cookies stored in NSHTTPCookieStore by setting 
      * NSMutableURLRequest.HTTPShouldHandleCookies = YES;
+     
+     * 通过设置NSMutableURLRequest.HTTPShouldHandleCookies = YES处理存储在NSHTTPCookieStore中的cookie。
      */
     SDWebImageDownloaderHandleCookies = 1 << 5,
 
     /**
      * Enable to allow untrusted SSL certificates.
      * Useful for testing purposes. Use with caution in production.
+     * 启用允许不可信SSL证书。 用于测试目的。 在生产中谨慎使用。
      */
     SDWebImageDownloaderAllowInvalidSSLCertificates = 1 << 6,
 
     /**
      * Put the image in the high priority queue.
+     * 把图片的下载放在搞优先级的队列，这样这张图片就会优先下载
      */
     SDWebImageDownloaderHighPriority = 1 << 7,
     
     /**
      * Scale down the image
+     * 缩小图像
      */
     SDWebImageDownloaderScaleDownLargeImages = 1 << 8,
 };
 
+
+/* 执行命令 */
 typedef NS_ENUM(NSInteger, SDWebImageDownloaderExecutionOrder) {
     /**
      * Default value. All download operations will execute in queue style (first-in-first-out).
+     * 默认值。 所有下载操作将以队列样式（先进先出）执行。
      */
     SDWebImageDownloaderFIFOExecutionOrder,
 
     /**
      * All download operations will execute in stack style (last-in-first-out).
+     * 所有下载操作将以堆栈样式（后进先出）执行。
      */
     SDWebImageDownloaderLIFOExecutionOrder
 };
@@ -133,6 +151,7 @@ typedef SDHTTPHeadersDictionary * _Nullable (^SDWebImageDownloaderHeadersFilterB
 
 /**
  *  Set the default URL credential to be set for request operations.
+ *  url凭据
  */
 @property (strong, nonatomic, nullable) NSURLCredential *urlCredential;
 

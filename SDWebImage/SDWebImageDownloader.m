@@ -168,10 +168,11 @@
         request.HTTPShouldUsePipelining = YES;
         if (sself.headersFilter) {
             request.allHTTPHeaderFields = sself.headersFilter(url, [sself.HTTPHeaders copy]);
-        }
-        else {
+        }else {
             request.allHTTPHeaderFields = sself.HTTPHeaders;
         }
+        
+        /* 自定义NSOperation */
         SDWebImageDownloaderOperation *operation = [[sself.operationClass alloc] initWithRequest:request inSession:sself.session options:options];
         operation.shouldDecompressImages = sself.shouldDecompressImages;
         
@@ -187,12 +188,17 @@
             operation.queuePriority = NSOperationQueuePriorityLow;
         }
 
+        // 这个操作相当于[operation start]，只是下面这个操作是吧operation放进了NSOperationQueue中开始执行。这样，系统会另外开启一个线程来执行这个operation。
         [sself.downloadQueue addOperation:operation];
+        
+        
+        // last in first out
         if (sself.executionOrder == SDWebImageDownloaderLIFOExecutionOrder) {
             // Emulate LIFO execution order by systematically adding new operations as last operation's dependency
             [sself.lastAddedOperation addDependency:operation];
             sself.lastAddedOperation = operation;
         }
+        /* NSOperation的一系列配置 */
 
         return operation;
     }];
@@ -222,6 +228,7 @@
 
     __block SDWebImageDownloadToken *token = nil;
 
+    // dispatch_barrier_sync在这个串行队列中同步添加一个任务，只有这个任务完成了之后，这个串行队列中后续添加的任务才能开始执行。
     dispatch_barrier_sync(self.barrierQueue, ^{
         SDWebImageDownloaderOperation *operation = self.URLOperations[url];
         if (!operation) {

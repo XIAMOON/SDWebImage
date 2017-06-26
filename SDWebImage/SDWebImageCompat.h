@@ -22,33 +22,40 @@
     #define SD_MAC 0
 #endif
 
+// 对于tvOS 和 iOS来说，我们都用UIKit。
+// 注意：尽管watchOS也用UIKit，但是是非常受限的，所以不归为UIKit。
 // iOS and tvOS are very similar, UIKit exists on both platforms
 // Note: watchOS also has UIKit, but it's very limited
+
+// 是否使用UIKit
 #if TARGET_OS_IOS || TARGET_OS_TV
     #define SD_UIKIT 1
 #else
     #define SD_UIKIT 0
 #endif
 
+// 是否是iOS平台
 #if TARGET_OS_IOS
     #define SD_IOS 1
 #else
     #define SD_IOS 0
 #endif
 
+// 是否是tvOS平台
 #if TARGET_OS_TV
     #define SD_TV 1
 #else
     #define SD_TV 0
 #endif
 
+// 是否是watchOS平台
 #if TARGET_OS_WATCH
     #define SD_WATCH 1
 #else
     #define SD_WATCH 0
 #endif
 
-
+// 是否是MAC平台
 #if SD_MAC
     #import <AppKit/AppKit.h>
     #ifndef UIImage

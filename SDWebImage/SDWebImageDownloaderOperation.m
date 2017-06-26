@@ -73,6 +73,8 @@ typedef NSMutableDictionary<NSString *, id> SDCallbacksDictionary;
         _finished = NO;
         _expectedSize = 0;
         _unownedSession = session;
+        
+        // 这是一个并发队列
         _barrierQueue = dispatch_queue_create("com.hackemist.SDWebImageDownloaderOperationBarrierQueue", DISPATCH_QUEUE_CONCURRENT);
     }
     return self;
@@ -117,6 +119,7 @@ typedef NSMutableDictionary<NSString *, id> SDCallbacksDictionary;
     return shouldCancel;
 }
 
+// 重写start方法，把你要做的操作放在start方法中。这里的操作是下载图片，所以把NSURLSession放在start方法里。
 - (void)start {
     @synchronized (self) {
         if (self.isCancelled) {
@@ -125,9 +128,11 @@ typedef NSMutableDictionary<NSString *, id> SDCallbacksDictionary;
             return;
         }
 
+        // 对于iOS应用或者watchOS应用来说，如果options设置了：SDWebImageDownloaderContinueInBackground 的话，需要启动后台下载。
 #if SD_UIKIT
         Class UIApplicationClass = NSClassFromString(@"UIApplication");
         BOOL hasApplication = UIApplicationClass && [UIApplicationClass respondsToSelector:@selector(sharedApplication)];
+        
         if (hasApplication && [self shouldContinueWhenAppEntersBackground]) {
             __weak __typeof__ (self) wself = self;
             UIApplication * app = [UIApplicationClass performSelector:@selector(sharedApplication)];
@@ -143,6 +148,8 @@ typedef NSMutableDictionary<NSString *, id> SDCallbacksDictionary;
             }];
         }
 #endif
+        
+        // 启用一个下载操作
         NSURLSession *session = self.unownedSession;
         if (!self.unownedSession) {
             NSURLSessionConfiguration *sessionConfig = [NSURLSessionConfiguration defaultSessionConfiguration];
@@ -152,6 +159,7 @@ typedef NSMutableDictionary<NSString *, id> SDCallbacksDictionary;
              *  Create the session for this task
              *  We send nil as delegate queue so that the session creates a serial operation queue for performing all delegate
              *  method calls and completion handler calls.
+             * delegateQueue为nil，这样的话，会默认创建一个串行队列。
              */
             self.ownedSession = [NSURLSession sessionWithConfiguration:sessionConfig
                                                               delegate:self
@@ -187,6 +195,7 @@ typedef NSMutableDictionary<NSString *, id> SDCallbacksDictionary;
         self.backgroundTaskId = UIBackgroundTaskInvalid;
     }
 #endif
+    
 }
 
 - (void)cancel {
@@ -244,6 +253,7 @@ typedef NSMutableDictionary<NSString *, id> SDCallbacksDictionary;
     [self didChangeValueForKey:@"isExecuting"];
 }
 
+// 方法重载，返回YES表示这个NSOperation是并行的
 - (BOOL)isConcurrent {
     return YES;
 }

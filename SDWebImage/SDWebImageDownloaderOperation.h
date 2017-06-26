@@ -38,6 +38,7 @@ extern NSString * _Nonnull const SDWebImageDownloadFinishNotification;
 @end
 
 
+// 这里封装自定义了一个用于下载图片的 NSOperation
 @interface SDWebImageDownloaderOperation : NSOperation <SDWebImageDownloaderOperationInterface, SDWebImageOperation, NSURLSessionTaskDelegate, NSURLSessionDataDelegate>
 
 /**
