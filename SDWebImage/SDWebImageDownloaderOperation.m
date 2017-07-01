@@ -253,7 +253,6 @@ typedef NSMutableDictionary<NSString *, id> SDCallbacksDictionary;
     [self didChangeValueForKey:@"isExecuting"];
 }
 
-// 方法重载，返回YES表示这个NSOperation是并行的
 - (BOOL)isConcurrent {
     return YES;
 }

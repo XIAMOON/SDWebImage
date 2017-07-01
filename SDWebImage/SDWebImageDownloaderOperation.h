@@ -64,6 +64,7 @@ extern NSString * _Nonnull const SDWebImageDownloadFinishNotification;
  * The credential used for authentication challenges in `-connection:didReceiveAuthenticationChallenge:`.
  *
  * This will be overridden by any shared credentials that exist for the username or password of the request URL, if present.
+ * 身份认证
  */
 @property (nonatomic, strong, nullable) NSURLCredential *credential;
 
@@ -98,12 +99,15 @@ extern NSString * _Nonnull const SDWebImageDownloadFinishNotification;
                                 options:(SDWebImageDownloaderOptions)options NS_DESIGNATED_INITIALIZER;
 
 /**
+ * 给progress和completion添加操作。该方法返回一个可以被调用用来取消这一系列回调的calcel:方法。
  *  Adds handlers for progress and completion. Returns a tokent that can be passed to -cancel: to cancel this set of
  *  callbacks.
  *
  *  @param progressBlock  the block executed when a new chunk of data arrives.
  *                        @note the progress block is executed on a background queue
  *  @param completedBlock the block executed when the download is done.
+ 
+ * // 注意：completed block将会在下载成功后在主线程执行。如果发生了错误，该block会在后台线程执行
  *                        @note the completed block is executed on the main queue for success. If errors are found, there is a chance the block will be executed on a background queue
  *
  *  @return the token to use to cancel this set of handlers

@@ -139,6 +139,8 @@
     }
 }
 
+
+
 - (nullable SDWebImageDownloadToken *)downloadImageWithURL:(nullable NSURL *)url
                                                    options:(SDWebImageDownloaderOptions)options
                                                   progress:(nullable SDWebImageDownloaderProgressBlock)progressBlock
@@ -153,25 +155,38 @@
         }
 
         // In order to prevent from potential duplicate caching (NSURLCache + SDImageCache) we disable the cache for image requests if told otherwise
+        
+        // NSURLRequestReloadIgnoringLocalCacheData：一直从远端加载，忽略本地缓存。
         NSURLRequestCachePolicy cachePolicy = NSURLRequestReloadIgnoringLocalCacheData;
+        
+        // 如果options指定了使用系统的NSURLCache
         if (options & SDWebImageDownloaderUseNSURLCache) {
-            if (options & SDWebImageDownloaderIgnoreCachedResponse) {
+            if (options & SDWebImageDownloaderIgnoreCachedResponse) { // 直接使用缓存，不发送请求
                 cachePolicy = NSURLRequestReturnCacheDataDontLoad;
-            } else {
+            } else { // 使用默认的缓存策略。
+                // 1、本地是否有缓存
+                // 2、缓存响应中有没有明确表示每次请求都要重新验证
+                // 3、本地的缓存请求是否过期
+                // 4、发送HEAD请求，查看资源是否发生变化
                 cachePolicy = NSURLRequestUseProtocolCachePolicy;
             }
         }
         
         NSMutableURLRequest *request = [[NSMutableURLRequest alloc] initWithURL:url cachePolicy:cachePolicy timeoutInterval:timeoutInterval];
         
+        // 该请求是否使用cookies中的一些默认配置，iOS10.3之后，这个值被忽略了
         request.HTTPShouldHandleCookies = (options & SDWebImageDownloaderHandleCookies);
+        
+        // 请求是否使用流水线式的(第一个请求完成了之后才能进行第二个请求)请求方式
         request.HTTPShouldUsePipelining = YES;
+        
         if (sself.headersFilter) {
             request.allHTTPHeaderFields = sself.headersFilter(url, [sself.HTTPHeaders copy]);
         }else {
             request.allHTTPHeaderFields = sself.HTTPHeaders;
         }
         
+#warning - 上次看到这里
         /* 自定义NSOperation */
         SDWebImageDownloaderOperation *operation = [[sself.operationClass alloc] initWithRequest:request inSession:sself.session options:options];
         operation.shouldDecompressImages = sself.shouldDecompressImages;
@@ -182,9 +197,9 @@
             operation.credential = [NSURLCredential credentialWithUser:sself.username password:sself.password persistence:NSURLCredentialPersistenceForSession];
         }
         
-        if (options & SDWebImageDownloaderHighPriority) {
+        if (options & SDWebImageDownloaderHighPriority) { // 高优先级
             operation.queuePriority = NSOperationQueuePriorityHigh;
-        } else if (options & SDWebImageDownloaderLowPriority) {
+        } else if (options & SDWebImageDownloaderLowPriority) { // 低优先级
             operation.queuePriority = NSOperationQueuePriorityLow;
         }
 
@@ -195,6 +210,8 @@
         // last in first out
         if (sself.executionOrder == SDWebImageDownloaderLIFOExecutionOrder) {
             // Emulate LIFO execution order by systematically adding new operations as last operation's dependency
+            
+            // 让上一个operation依赖于当前正在添加的operation，意思是等待当前operation执行完之后才能执行上次添加的operation。
             [sself.lastAddedOperation addDependency:operation];
             sself.lastAddedOperation = operation;
         }
@@ -233,17 +250,23 @@
         SDWebImageDownloaderOperation *operation = self.URLOperations[url];
         if (!operation) {
             operation = createCallback();
-            self.URLOperations[url] = operation;
+            
+#warning - 这里为什么要把operation缓存起来
+            self.URLOperations[url] = operation; // 等同于 setValue: forKey:
 
             __weak SDWebImageDownloaderOperation *woperation = operation;
             operation.completionBlock = ^{
               SDWebImageDownloaderOperation *soperation = woperation;
               if (!soperation) return;
+            
+              // 操作执行完成后移除operation缓存。
               if (self.URLOperations[url] == soperation) {
                   [self.URLOperations removeObjectForKey:url];
               };
             };
         }
+        
+        // 之所以返回一个token，是为了可以执行cancel: 方法来取消下载操作。
         id downloadOperationCancelToken = [operation addHandlersForProgress:progressBlock completed:completedBlock];
 
         token = [SDWebImageDownloadToken new];

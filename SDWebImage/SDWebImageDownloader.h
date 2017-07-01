@@ -30,7 +30,7 @@ typedef NS_OPTIONS(NSUInteger, SDWebImageDownloaderOptions) {
      * (to be combined with `SDWebImageDownloaderUseNSURLCache`).
      * I think this option should be renamed to 'SDWebImageDownloaderUsingCachedResponseDontLoad'
      
-     * 如果从NSURLCache读取图像（与“SDWebImageDownloaderUseNSURLCache”组合），则使用空的 image / imageData来回调completion block。 我认为这个选项应该重命名为'SDWebImageDownloaderUsingCachedResponseDontLoad'
+     * 如果从NSURLCache读取图像（与“SDWebImageDownloaderUseNSURLCache”组合），则使用空的 image / imageData来回调completion block。 我认为这个选项应该重命名为'SDWebImageDownloaderUsingCachedResponseDontLoad'，意为：直接使用缓存而不发送请求。
      */
     SDWebImageDownloaderIgnoreCachedResponse = 1 << 3,
     
@@ -59,7 +59,7 @@ typedef NS_OPTIONS(NSUInteger, SDWebImageDownloaderOptions) {
 
     /**
      * Put the image in the high priority queue.
-     * 把图片的下载放在搞优先级的队列，这样这张图片就会优先下载
+     * 把图片的下载放在高优先级的队列，这样这张图片就会优先下载
      */
     SDWebImageDownloaderHighPriority = 1 << 7,
     
@@ -151,7 +151,7 @@ typedef SDHTTPHeadersDictionary * _Nullable (^SDWebImageDownloaderHeadersFilterB
 
 /**
  *  Set the default URL credential to be set for request operations.
- *  url凭据
+ *  身份认证
  */
 @property (strong, nonatomic, nullable) NSURLCredential *urlCredential;
 
@@ -202,6 +202,8 @@ typedef SDHTTPHeadersDictionary * _Nullable (^SDWebImageDownloaderHeadersFilterB
  *
  * @param operationClass The subclass of `SDWebImageDownloaderOperation` to set 
  *        as default. Passing `nil` will revert to `SDWebImageDownloaderOperation`.
+ *
+ * 自己指定一个DownloaderOperation，但是要遵循SDWebImageDownloaderOperationInterface协议
  */
 - (void)setOperationClass:(nullable Class)operationClass;
 

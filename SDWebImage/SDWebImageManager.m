@@ -204,7 +204,6 @@
             }
             
             // 下载图片并返回一个Token
-#warning - 下次从这里开始看
             SDWebImageDownloadToken *subOperationToken = [self.imageDownloader downloadImageWithURL:url options:downloaderOptions progress:progressBlock completed:^(UIImage *downloadedImage, NSData *downloadedData, NSError *error, BOOL finished) {
                 
                 __strong __typeof(weakOperation) strongOperation = weakOperation;
