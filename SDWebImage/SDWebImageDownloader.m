@@ -10,6 +10,14 @@
 #import "SDWebImageDownloaderOperation.h"
 #import <ImageIO/ImageIO.h>
 
+
+/* SDWebImageDownloader是一个共享的单例，这意味着_downloadQueue、_barrierQueue、_session都只会创建一次。
+ * 它里面包含了一个_downloadQueue，这个队列是一个大的队列，它里面会包含着多个图片operation的请求，每个图片的下载都会调用 downloadImageWithURL: 这个方法来创建一个NSOperation，并添加到_downloadQueue这个大队列里面。
+ * 还包含着一个_barrierQueue
+ * 还有一个_session，NSURLSession。
+ */
+
+
 @implementation SDWebImageDownloadToken
 @end
 
@@ -72,6 +80,8 @@
         _operationClass = [SDWebImageDownloaderOperation class];
         _shouldDecompressImages = YES;
         _executionOrder = SDWebImageDownloaderFIFOExecutionOrder;
+        
+        // downloadQueue是一个大的队列，它里面会包含着多个operation请求
         _downloadQueue = [NSOperationQueue new];
         _downloadQueue.maxConcurrentOperationCount = 6;
         _downloadQueue.name = @"com.hackemist.SDWebImageDownloader";
@@ -81,6 +91,7 @@
 #else
         _HTTPHeaders = [@{@"Accept": @"image/*;q=0.8"} mutableCopy];
 #endif
+        
         _barrierQueue = dispatch_queue_create("com.hackemist.SDWebImageDownloaderBarrierQueue", DISPATCH_QUEUE_CONCURRENT);
         _downloadTimeout = 15.0;
 
@@ -91,6 +102,7 @@
          *  We send nil as delegate queue so that the session creates a serial operation queue for performing all delegate
          *  method calls and completion handler calls.
          */
+        // 创建一个session回话用于url下载
         self.session = [NSURLSession sessionWithConfiguration:sessionConfiguration
                                                      delegate:self
                                                 delegateQueue:nil];
@@ -140,7 +152,6 @@
 }
 
 
-
 - (nullable SDWebImageDownloadToken *)downloadImageWithURL:(nullable NSURL *)url
                                                    options:(SDWebImageDownloaderOptions)options
                                                   progress:(nullable SDWebImageDownloaderProgressBlock)progressBlock
@@ -149,6 +160,8 @@
 
     return [self addProgressCallback:progressBlock completedBlock:completedBlock forURL:url createCallback:^SDWebImageDownloaderOperation *{
         __strong __typeof (wself) sself = wself;
+        
+        /* 创建一个NSMutableRequest */
         NSTimeInterval timeoutInterval = sself.downloadTimeout;
         if (timeoutInterval == 0.0) {
             timeoutInterval = 15.0;
@@ -185,9 +198,11 @@
         }else {
             request.allHTTPHeaderFields = sself.HTTPHeaders;
         }
+        /* 创建一个NSMutableRequest */
         
-#warning - 上次看到这里
-        /* 自定义NSOperation */
+        
+        
+        /* 自定义NSOperation，每请求一个新的图片就会对应着一个新的operation */
         SDWebImageDownloaderOperation *operation = [[sself.operationClass alloc] initWithRequest:request inSession:sself.session options:options];
         operation.shouldDecompressImages = sself.shouldDecompressImages;
         
@@ -203,7 +218,7 @@
             operation.queuePriority = NSOperationQueuePriorityLow;
         }
 
-        // 这个操作相当于[operation start]，只是下面这个操作是吧operation放进了NSOperationQueue中开始执行。这样，系统会另外开启一个线程来执行这个operation。
+        // 这个操作相当于[operation start]，只是下面这个操作是把operation放进了_downloadQueue中开始执行。这样，系统会另外开启一个线程来执行这个operation。而且，一般每个operation都在不同的线程中执行，但是_downloadQueue会只能允许最大开启 maxConcurrentOperationCount 个线程。
         [sself.downloadQueue addOperation:operation];
         
         
@@ -215,7 +230,7 @@
             [sself.lastAddedOperation addDependency:operation];
             sself.lastAddedOperation = operation;
         }
-        /* NSOperation的一系列配置 */
+        /* 自定义NSOperation */
 
         return operation;
     }];
@@ -247,11 +262,20 @@
 
     // dispatch_barrier_sync在这个串行队列中同步添加一个任务，只有这个任务完成了之后，这个串行队列中后续添加的任务才能开始执行。
     dispatch_barrier_sync(self.barrierQueue, ^{
+        
+        /*
+         * 这里用了个Block来创建operation是非常巧妙的。之所以这样设计是因为如果同时下载了多个相同URL的图像，那么除第一
+         * 次外，后几次都是不会去重新创建一个operation的，而是用了存在_URLOperations中的跟之前相同的operation。
+         * 注意：一个operation的完整过程是要经历所有的NSURLSessionDataDelegate的回调的。在后续添加的相同的URL图片请求时，只有一个operation会经历所有的回调，其他的都会共享这一个operation的回调。
+         * [operation addHandlersForProgress:progressBlock completed:completedBlock]; 拿到相同的operation后，每个operation都会执行这一句代码，这是因为每个图片都对应着自己的progressBlock和completedBlock。
+         * 这里做了一个实验：请求5个相同URL的图片，但是每个图片的请求时间都会相对于前一个请求延时4秒，但是后面的图片的progressBlock的回调并非从0.0开始。这是因为后面的请求共享了第一个请求的NSURLSessionDataDelegate回调，所以最后progressBlock的回调是一样的。
+         */
         SDWebImageDownloaderOperation *operation = self.URLOperations[url];
+        
         if (!operation) {
             operation = createCallback();
             
-#warning - 这里为什么要把operation缓存起来
+#warning - 这里为什么要把operation缓存起来？缓存的目的是减少相同的请求，或者用来传值。这里是为了防止对相同URL的图片重复创建operation和监听NSURLSessionDataDelegate回调。
             self.URLOperations[url] = operation; // 等同于 setValue: forKey:
 
             __weak SDWebImageDownloaderOperation *woperation = operation;
@@ -267,12 +291,14 @@
         }
         
         // 之所以返回一个token，是为了可以执行cancel: 方法来取消下载操作。
+        // 每个operation，哪怕是相同URL的operation，都会添加自己的progressBlock和completedBlock回调，来处理自己应该处理的事情。
         id downloadOperationCancelToken = [operation addHandlersForProgress:progressBlock completed:completedBlock];
 
         token = [SDWebImageDownloadToken new];
         token.url = url;
         token.downloadOperationCancelToken = downloadOperationCancelToken;
     });
+#warning - 这里的代码执行了很多次之后才执行到operation中的start: 方法，探索一下这是为什么？
 
     return token;
 }

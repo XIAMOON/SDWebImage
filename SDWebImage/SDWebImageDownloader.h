@@ -53,7 +53,7 @@ typedef NS_OPTIONS(NSUInteger, SDWebImageDownloaderOptions) {
     /**
      * Enable to allow untrusted SSL certificates.
      * Useful for testing purposes. Use with caution in production.
-     * 启用允许不可信SSL证书。 用于测试目的。 在生产中谨慎使用。
+     * 允许不可信的SSL证书。 用于测试目的。 在生产中谨慎使用。
      */
     SDWebImageDownloaderAllowInvalidSSLCertificates = 1 << 6,
 
@@ -98,6 +98,8 @@ typedef NSMutableDictionary<NSString *, NSString *> SDHTTPHeadersMutableDictiona
 
 typedef SDHTTPHeadersDictionary * _Nullable (^SDWebImageDownloaderHeadersFilterBlock)(NSURL * _Nullable url, SDHTTPHeadersDictionary * _Nullable headers);
 
+
+// downloadOperationCancelToken记录的是一个字典：callbacks1: {@"progress":Block1, @"completed":Block11}
 /**
  *  A token associated with each download. Can be used to cancel a download
  */

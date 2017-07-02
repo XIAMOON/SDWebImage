@@ -61,6 +61,7 @@ typedef NSMutableDictionary<NSString *, id> SDCallbacksDictionary;
     return [self initWithRequest:nil inSession:nil options:0];
 }
 
+// 对于每一个图片的请求都对应着一个新的operation。
 - (nonnull instancetype)initWithRequest:(nullable NSURLRequest *)request
                               inSession:(nullable NSURLSession *)session
                                 options:(SDWebImageDownloaderOptions)options {
@@ -74,7 +75,7 @@ typedef NSMutableDictionary<NSString *, id> SDCallbacksDictionary;
         _expectedSize = 0;
         _unownedSession = session;
         
-        // 这是一个并发队列
+        // 这是一个并发队列，对于每个图片的请求都会创建一个新的_barrierQueue。
         _barrierQueue = dispatch_queue_create("com.hackemist.SDWebImageDownloaderOperationBarrierQueue", DISPATCH_QUEUE_CONCURRENT);
     }
     return self;
@@ -95,10 +96,17 @@ typedef NSMutableDictionary<NSString *, id> SDCallbacksDictionary;
     return callbacks;
 }
 
+// callbacks1: {@"progress":Block1, @"completed":Block11}
+// callbacks2: {@"progress":Block2, @"completed":Block22}
+// callbacks3: {@"progress":Block3, @"completed":Block33}
+// self.callbackBlocks: [callbacks1, callbacks2, callbacks3]
+
+// 返回所有指定key的Block，如指定key为@"progress"时，返回@[Block1, Block2, Block3]; 指定key为@"completed"时，返回@[Block11, Block22, Block33]。
 - (nullable NSArray<id> *)callbacksForKey:(NSString *)key {
     __block NSMutableArray<id> *callbacks = nil;
     dispatch_sync(self.barrierQueue, ^{
         // We need to remove [NSNull null] because there might not always be a progress block for each callback
+        
         callbacks = [[self.callbackBlocks valueForKey:key] mutableCopy];
         [callbacks removeObjectIdenticalTo:[NSNull null]];
     });
@@ -171,6 +179,7 @@ typedef NSMutableDictionary<NSString *, id> SDCallbacksDictionary;
         self.executing = YES;
     }
     
+    // 执行下载操作
     [self.dataTask resume];
 
     if (self.dataTask) {
@@ -422,6 +431,7 @@ didReceiveResponse:(NSURLResponse *)response
     if (error) {
         [self callCompletionBlocksWithError:error];
     } else {
+        // 在self.callBackBlocks中查找所有以@"completed"作为key的Block回调，返回的是一个装满completedBlock的回调。
         if ([self callbacksForKey:kCompletedCallbackKey].count > 0) {
             /**
              *  If you specified to use `NSURLCache`, then the response you get here is what you need.
@@ -429,9 +439,18 @@ didReceiveResponse:(NSURLResponse *)response
              *  the response data will be nil.
              *  So we don't need to check the cache option here, since the system will obey the cache option
              */
+            
+            /*
+             * 如果你指定使用`NSURLCache`，那么你所得到的这个响应就是你所需要的。
+             * 如果您指定仅通过“SDWebImageDownloaderIgnoreCachedResponse”使用缓存数据，则响应数据将为零。
+             * 所以我们不需要在这里检查缓存选项，因为系统会遵循缓存选项
+             */
             if (self.imageData) {
+                // 通过data来获取图片
                 UIImage *image = [UIImage sd_imageWithData:self.imageData];
+                
                 NSString *key = [[SDWebImageManager sharedManager] cacheKeyForURL:self.request.URL];
+                
                 image = [self scaledImageForKey:key image:image];
                 
                 // Do not force decoding animated GIFs

@@ -39,6 +39,7 @@
 }
 
 - (nonnull instancetype)init {
+    // 初始化时 初始化一个Cache、一个downloader下载管理器
     SDImageCache *cache = [SDImageCache sharedImageCache];
     SDWebImageDownloader *downloader = [SDWebImageDownloader sharedDownloader];
     return [self initWithCache:cache downloader:downloader];
@@ -187,23 +188,50 @@
             
             // download if no image or requested to refresh anyway, and download allowed by delegate
             SDWebImageDownloaderOptions downloaderOptions = 0;
+            // "|="运算符：a |= b ---> a = a | b ;
+            
+            // 低优先级
             if (options & SDWebImageLowPriority) downloaderOptions |= SDWebImageDownloaderLowPriority;
+            
+            // 渐进式下载
             if (options & SDWebImageProgressiveDownload) downloaderOptions |= SDWebImageDownloaderProgressiveDownload;
+            
+#warning - sdadasd
+            // 使用NSURLCache，缓存request请求
             if (options & SDWebImageRefreshCached) downloaderOptions |= SDWebImageDownloaderUseNSURLCache;
+            
+            // 后台下载
             if (options & SDWebImageContinueInBackground) downloaderOptions |= SDWebImageDownloaderContinueInBackground;
+            
+            // 处理存储在NSHTTPCookieStore中的cookie
             if (options & SDWebImageHandleCookies) downloaderOptions |= SDWebImageDownloaderHandleCookies;
+            
+            // 允许不可信的SSL证书。 用于测试目的。 在生产中谨慎使用
             if (options & SDWebImageAllowInvalidSSLCertificates) downloaderOptions |= SDWebImageDownloaderAllowInvalidSSLCertificates;
+            
+            // 高优先级下载
             if (options & SDWebImageHighPriority) downloaderOptions |= SDWebImageDownloaderHighPriority;
+            
+            // 缩小头像
             if (options & SDWebImageScaleDownLargeImages) downloaderOptions |= SDWebImageDownloaderScaleDownLargeImages;
             
+            // 
             if (cachedImage && options & SDWebImageRefreshCached) {
                 // force progressive off if image already cached but forced refreshing
+                // 这个操作会强制剔除“渐进式下载”这个选项
                 downloaderOptions &= ~SDWebImageDownloaderProgressiveDownload;
+                
                 // ignore image read from NSURLCache if image if cached but force refreshing
+                // 忽略从NSURLCache读取的图像
                 downloaderOptions |= SDWebImageDownloaderIgnoreCachedResponse;
             }
             
-            // 下载图片并返回一个Token
+            /* 下载图片并返回一个Token
+             * self.imageDownloader是一个共享的单例，
+             * 它里面包含了一个_downloadQueue，这个队列是一个大的队列，它里面会包含着多个图片operation的请求
+             * 还包含着一个_barrierQueue
+             * 还有一个_session，NSURLSession。
+             */
             SDWebImageDownloadToken *subOperationToken = [self.imageDownloader downloadImageWithURL:url options:downloaderOptions progress:progressBlock completed:^(UIImage *downloadedImage, NSData *downloadedData, NSError *error, BOOL finished) {
                 
                 __strong __typeof(weakOperation) strongOperation = weakOperation;
@@ -231,6 +259,7 @@
                         }
                     }
                 }
+                
                 // 有可能在第一次就下载成功了，也有可能之前下载失败了，被加入了黑名单
                 else {
                     if ((options & SDWebImageRetryFailed)) {

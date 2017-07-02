@@ -18,6 +18,7 @@
 
 @property (nonatomic, strong) UILabel *customTextLabel;
 @property (nonatomic, strong) FLAnimatedImageView *customImageView;
+@property (nonatomic, strong) UIProgressView *progressView;
 
 @end
 
@@ -28,11 +29,14 @@
     if (self = [super initWithStyle:style reuseIdentifier:reuseIdentifier]) {
         _customImageView = [[FLAnimatedImageView alloc] initWithFrame:CGRectMake(20.0, 2.0, 60.0, 40.0)];
         [self.contentView addSubview:_customImageView];
-        _customTextLabel = [[UILabel alloc] initWithFrame:CGRectMake(100.0, 12.0, 200, 20.0)];
+        _customTextLabel = [[UILabel alloc] initWithFrame:CGRectMake(100.0, 12.0, 50, 20.0)];
         [self.contentView addSubview:_customTextLabel];
         
         _customImageView.clipsToBounds = YES;
         _customImageView.contentMode = UIViewContentModeScaleAspectFill;
+        
+        _progressView = [[UIProgressView alloc] initWithFrame:CGRectMake(CGRectGetMaxX(_customTextLabel.frame)+10, 20, CGRectGetWidth(self.frame)-CGRectGetMaxX(_customTextLabel.frame)-20, 5)];
+        [self.contentView addSubview:_progressView];
     }
     return self;
 }
@@ -67,19 +71,22 @@
         [SDWebImageManager sharedManager].imageDownloader.password = @"httpwatch01";
         
         _objects = [NSMutableArray arrayWithObjects:
-                    @"http://www.httpwatch.com/httpgallery/authentication/authenticatedimage/default.aspx?0.35786508303135633",     // requires HTTP auth, used to demo the NTLM auth
-                    @"http://assets.sbnation.com/assets/2512203/dogflops.gif",
+//                    @"http://www.httpwatch.com/httpgallery/authentication/authenticatedimage/default.aspx?0.35786508303135633",     // requires HTTP auth, used to demo the NTLM auth
+//                    @"http://assets.sbnation.com/assets/2512203/dogflops.gif",
                     @"https://raw.githubusercontent.com/liyong03/YLGIFImage/master/YLGIFImageDemo/YLGIFImageDemo/joy.gif",
-                    @"http://www.ioncannon.net/wp-content/uploads/2011/06/test2.webp",
-                    @"http://www.ioncannon.net/wp-content/uploads/2011/06/test9.webp",
-                    @"http://littlesvr.ca/apng/images/SteamEngine.webp",
-                    @"http://littlesvr.ca/apng/images/world-cup-2014-42.webp",
-                    @"https://nr-platform.s3.amazonaws.com/uploads/platform/published_extension/branding_icon/275/AmazonS3.png",
+                    @"https://raw.githubusercontent.com/liyong03/YLGIFImage/master/YLGIFImageDemo/YLGIFImageDemo/joy.gif",
+                    @"https://raw.githubusercontent.com/liyong03/YLGIFImage/master/YLGIFImageDemo/YLGIFImageDemo/joy.gif",
+                    @"https://raw.githubusercontent.com/liyong03/YLGIFImage/master/YLGIFImageDemo/YLGIFImageDemo/joy.gif",
+//                    @"http://www.ioncannon.net/wp-content/uploads/2011/06/test2.webp",
+//                    @"http://www.ioncannon.net/wp-content/uploads/2011/06/test9.webp",
+//                    @"http://littlesvr.ca/apng/images/SteamEngine.webp",
+//                    @"http://littlesvr.ca/apng/images/world-cup-2014-42.webp",
+//                    @"https://nr-platform.s3.amazonaws.com/uploads/platform/published_extension/branding_icon/275/AmazonS3.png",
                     nil];
 
-        for (int i=0; i<100; i++) {
-            [_objects addObject:[NSString stringWithFormat:@"https://s3.amazonaws.com/fast-image-cache/demo-images/FICDDemoImage%03d.jpg", i]];
-        }
+//        for (int i=0; i<100; i++) {
+//            [_objects addObject:[NSString stringWithFormat:@"https://s3.amazonaws.com/fast-image-cache/demo-images/FICDDemoImage%03d.jpg", i]];
+//        }
 
     }
     [SDWebImageManager.sharedManager.imageDownloader setValue:@"SDWebImage Demo" forHTTPHeaderField:@"AppName"];
@@ -128,9 +135,19 @@
     [cell.customImageView sd_setIndicatorStyle:UIActivityIndicatorViewStyleGray];
     
     cell.customTextLabel.text = [NSString stringWithFormat:@"Image #%ld", (long)indexPath.row];
-    [cell.customImageView sd_setImageWithURL:[NSURL URLWithString:_objects[indexPath.row]]
-                            placeholderImage:placeholderImage
-                                     options:indexPath.row == 0 ? SDWebImageRefreshCached : 0];    
+    
+    dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(4*(indexPath.row) * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
+        [cell.customImageView sd_setImageWithURL:[NSURL URLWithString:_objects[indexPath.row]] placeholderImage:placeholderImage options:0 progress:^(NSInteger receivedSize, NSInteger expectedSize, NSURL * _Nullable targetURL) {
+            dispatch_async(dispatch_get_main_queue(), ^{
+                [cell.progressView setProgress:(float)receivedSize/expectedSize animated:YES];
+            });
+        } completed:nil];
+    });
+    
+//    [cell.customImageView sd_setImageWithURL:[NSURL URLWithString:_objects[indexPath.row]]
+//                            placeholderImage:placeholderImage
+//                                     options:indexPath.row == 0 ? SDWebImageRefreshCached : 0];
+    
     return cell;
 }
 
